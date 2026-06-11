@@ -186,8 +186,8 @@ private fun StreamItem.preparationKey(): String {
 
     return listOf(
         addonId.lowercase(),
-        infoHash.orEmpty().lowercase(),
-        fileIdx?.toString().orEmpty(),
+        getEffectiveInfoHash().orEmpty().lowercase(),
+        getEffectiveFileIdx()?.toString().orEmpty(),
         behaviorHints.filename.orEmpty().lowercase(),
         playableDirectUrl.orEmpty().lowercase(),
         name.orEmpty().lowercase(),

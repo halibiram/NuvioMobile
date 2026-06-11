@@ -108,7 +108,7 @@ private val FINAL_CACHE_STATES = setOf(
 )
 
 internal fun StreamItem.localAvailabilityHash(): String? =
-    infoHash
+    getEffectiveInfoHash()
         ?.trim()
         ?.lowercase()
         ?.takeIf { isInstalledAddonStream && needsLocalDebridResolve && it.isNotBlank() }

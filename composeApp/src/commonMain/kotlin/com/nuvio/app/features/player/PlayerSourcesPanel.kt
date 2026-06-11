@@ -217,7 +217,7 @@ fun PlayerSourcesPanel(
                                 ) {
                                     itemsIndexed(
                                         items = streams,
-                                        key = { index, stream -> "${stream.addonId}::${index}::${stream.url ?: stream.infoHash ?: stream.clientResolve?.infoHash ?: stream.name}" },
+                                        key = { index, stream -> "${stream.addonId}::${index}::${stream.url ?: stream.getEffectiveInfoHash() ?: stream.clientResolve?.infoHash ?: stream.name}" },
                                     ) { _, stream ->
                                         val isCurrent = isCurrentStream(
                                             stream = stream,

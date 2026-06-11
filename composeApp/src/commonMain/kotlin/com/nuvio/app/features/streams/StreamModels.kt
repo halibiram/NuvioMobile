@@ -34,7 +34,7 @@ data class StreamItem(
 
     val playableDirectUrl: String?
         get() = listOfNotNull(url, externalUrl)
-            .firstOrNull { !it.isMagnetLink() }
+            .firstOrNull { !it.isMagnetLink() && !it.isTorrentUrl() }
 
     val torrentMagnetUri: String?
         get() = listOfNotNull(url, externalUrl)
@@ -47,11 +47,13 @@ data class StreamItem(
         get() = addonId.startsWith("addon:")
 
     val isTorrentStream: Boolean
-        get() = !isDirectDebridStream && (
-            !infoHash.isNullOrBlank() ||
-            url.isMagnetLink() ||
-            externalUrl.isMagnetLink()
-        )
+        get() = !isDirectDebridStream &&
+            playableDirectUrl.isNullOrBlank() && (
+                !infoHash.isNullOrBlank() ||
+                url.isMagnetLink() ||
+                externalUrl.isMagnetLink() ||
+                hasTorrentUrl()
+            )
 
     val isCachedDebridTorrentStream: Boolean
         get() = isTorrentStream && debridCacheStatus?.state == StreamDebridCacheState.CACHED
@@ -60,9 +62,8 @@ data class StreamItem(
         get() = isTorrentStream && playableDirectUrl == null
 
     val p2pInfoHash: String?
-        get() = infoHash.normalizedInfoHash()
+        get() = getEffectiveInfoHash()
             ?: clientResolve?.infoHash.normalizedInfoHash()
-            ?: torrentMagnetUri.extractBtihInfoHash()
 
     val p2pTrackers: List<String>
         get() = sources
@@ -78,6 +79,46 @@ data class StreamItem(
 
     val hasPlayableSource: Boolean
         get() = url != null || infoHash != null || externalUrl != null || clientResolve != null
+
+    fun getEffectiveInfoHash(): String? =
+        infoHash?.takeIf { it.isNotBlank() }
+            ?: url?.let { extractInfoHashFromTorrentUrl(it) ?: extractInfoHashFromMagnetLink(it) }
+            ?: externalUrl?.let { extractInfoHashFromTorrentUrl(it) ?: extractInfoHashFromMagnetLink(it) }
+
+    fun getEffectiveFileIdx(): Int? =
+        fileIdx ?: url?.let { extractFileIdxFromTorrentUrl(it) } ?: externalUrl?.let { extractFileIdxFromTorrentUrl(it) }
+
+    fun String.isTorrentUrl(): Boolean =
+        this.trimStart().startsWith("torrent:", ignoreCase = true)
+
+    private fun hasTorrentUrl(): Boolean =
+        url?.isTorrentUrl() == true || externalUrl?.isTorrentUrl() == true
+
+    private fun extractInfoHashFromTorrentUrl(url: String): String? {
+        if (!url.startsWith("torrent:", ignoreCase = true)) return null
+        val clean = url.substringAfter("torrent://").substringAfter("torrent:")
+            .substringBefore('?')
+            .trimEnd('/')
+        val hash = clean.substringBefore('/')
+        return hash.takeIf { it.length == 40 || it.length == 32 }
+    }
+
+    private fun extractInfoHashFromMagnetLink(url: String): String? {
+        if (!url.startsWith("magnet:", ignoreCase = true)) return null
+        val btih = url.substringAfter("urn:btih:", "")
+        if (btih.isBlank()) return null
+        val hash = btih.substringBefore('&').substringBefore('?')
+        return hash.takeIf { it.length == 40 || it.length == 32 }
+    }
+
+    private fun extractFileIdxFromTorrentUrl(url: String): Int? {
+        if (!url.startsWith("torrent:", ignoreCase = true)) return null
+        val clean = url.substringAfter("torrent://").substringAfter("torrent:")
+            .substringBefore('?')
+            .trimEnd('/')
+        val idxStr = clean.substringAfter('/', "").substringBefore('/')
+        return idxStr.toIntOrNull()
+    }
 }
 
 data class StreamBadge(

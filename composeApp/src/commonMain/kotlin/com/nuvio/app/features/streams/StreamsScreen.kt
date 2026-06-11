@@ -933,7 +933,7 @@ internal fun streamCardRenderKey(
     append(':')
     append(itemIndex)
     append(':')
-    append(stream.url ?: stream.infoHash ?: stream.clientResolve?.infoHash ?: stream.streamLabel)
+    append(stream.url ?: stream.getEffectiveInfoHash() ?: stream.clientResolve?.infoHash ?: stream.streamLabel)
 }
 
 // ---------------------------------------------------------------------------

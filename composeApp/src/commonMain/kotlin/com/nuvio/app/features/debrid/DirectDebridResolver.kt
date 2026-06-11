@@ -206,7 +206,7 @@ private class LocalDebridAddonStreamResolver(
         val account = localTorrentResolveCredential() ?: return DirectDebridResolveResult.MissingApiKey
         val apiKey = account.apiKey.trim()
 
-        val hash = stream.infoHash?.trim()?.lowercase()
+        val hash = stream.getEffectiveInfoHash()?.trim()?.lowercase()
         if (stream.debridCacheStatus?.state == StreamDebridCacheState.NOT_CACHED) {
             return DirectDebridResolveResult.NotCached
         }
@@ -298,12 +298,12 @@ private fun StreamItem.debridResolveCacheKey(season: Int?, episode: Int?): Strin
     if (resolve == null && needsLocalDebridResolve) {
         val account = localTorrentResolveCredential() ?: return null
         val apiKey = account.apiKey.trim().takeIf { it.isNotBlank() } ?: return null
-        val identity = infoHash ?: torrentMagnetUri ?: behaviorHints.filename ?: return null
+        val identity = getEffectiveInfoHash() ?: torrentMagnetUri ?: behaviorHints.filename ?: return null
         return listOf(
             account.provider.id,
             apiKey.stableFingerprint(),
             identity.trim().lowercase(),
-            fileIdx?.toString().orEmpty(),
+            getEffectiveFileIdx()?.toString().orEmpty(),
             behaviorHints.filename.orEmpty().trim().lowercase(),
             season?.toString().orEmpty(),
             episode?.toString().orEmpty(),
@@ -338,8 +338,8 @@ private fun StreamItem.debridResolveCacheKey(season: Int?, episode: Int?): Strin
 private fun StreamItem.toResolveMetadata(season: Int?, episode: Int?, providerId: String): StreamClientResolve =
     StreamClientResolve(
         type = "torrent",
-        infoHash = infoHash,
-        fileIdx = fileIdx,
+        infoHash = getEffectiveInfoHash(),
+        fileIdx = getEffectiveFileIdx(),
         magnetUri = torrentMagnetUri,
         sources = sources,
         torrentName = title ?: name,
