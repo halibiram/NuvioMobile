@@ -186,6 +186,7 @@ fun DetailHero(
                         onError = onHeroTrailerError,
                         onControllerReady = { playbackState.controller = it },
                         onSnapshot = { playbackState.snapshot = it },
+                        fullscreen = showFullscreenControls,
                     )
                     Box(
                         modifier = Modifier

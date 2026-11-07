@@ -17,4 +17,5 @@ expect fun HeroTrailerPlayerSurface(
     onError: () -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit = {},
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit = {},
+    fullscreen: Boolean = false,
 )

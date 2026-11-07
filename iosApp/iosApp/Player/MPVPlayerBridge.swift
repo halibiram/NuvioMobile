@@ -14,6 +14,14 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         return ensurePlayerViewController()
     }
 
+    func configurePresentation(embedded: Bool, fullscreen: Bool, muted: Bool) {
+        ensurePlayerViewController().configurePresentation(
+            embedded: embedded,
+            fullscreen: fullscreen,
+            muted: muted
+        )
+    }
+
     private func ensurePlayerViewController() -> MPVPlayerViewController {
         if let playerVC { return playerVC }
         let vc = MPVPlayerViewController()
@@ -291,21 +299,35 @@ final class MPVPlayerViewController: UIViewController {
         return _currentErrorMessage ?? ""
     }
     private var _currentErrorMessage: String?
+    private var embeddedPlayback = false
+    private var fullscreenPresentation = true
+    private var muted = false
+    private var audioSessionActivated = false
+
+    func configurePresentation(embedded: Bool, fullscreen: Bool, muted: Bool) {
+        let fullscreenChanged = fullscreenPresentation != fullscreen
+        embeddedPlayback = embedded
+        fullscreenPresentation = fullscreen
+        setMuted(muted)
+        if isViewLoaded, fullscreenChanged {
+            refreshImmersiveSystemUI()
+        }
+    }
 
     override var canBecomeFirstResponder: Bool {
-        true
+        !embeddedPlayback
     }
 
     override var prefersHomeIndicatorAutoHidden: Bool {
-        true
+        fullscreenPresentation
     }
 
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
-        [.bottom, .left, .right]
+        fullscreenPresentation ? [.bottom, .left, .right] : []
     }
 
     override var prefersStatusBarHidden: Bool {
-        true
+        fullscreenPresentation
     }
 
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
@@ -349,9 +371,11 @@ final class MPVPlayerViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         refreshImmersiveSystemUI()
-        becomeFirstResponder()
-        UIApplication.shared.beginReceivingRemoteControlEvents()
-        publishCachedNowPlayingInfoIfNeeded()
+        if !embeddedPlayback {
+            becomeFirstResponder()
+            UIApplication.shared.beginReceivingRemoteControlEvents()
+            publishCachedNowPlayingInfoIfNeeded()
+        }
         syncVideoSurfaceLayout()
         attemptStartPendingLoad()
     }
@@ -479,6 +503,7 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "ao", Self.defaultAudioOutput))
         checkError(mpv_set_option_string(mpv, "audio-channels", "auto"))
         checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
+        checkError(mpv_set_option_string(mpv, "mute", muted ? "yes" : "no"))
         checkError(mpv_set_option_string(mpv, "vulkan-swap-mode", "fifo"))
         checkError(mpv_set_option_string(mpv, "vulkan-queue-count", "1"))
         checkError(mpv_set_option_string(mpv, "vulkan-async-compute", "no"))
@@ -723,8 +748,13 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     func setMuted(_ muted: Bool) {
+        let wasMuted = self.muted
+        self.muted = muted
         guard mpv != nil else { return }
         setFlag("mute", muted)
+        if embeddedPlayback, wasMuted, !muted {
+            activateAudioSessionForPlayback()
+        }
     }
 
     func setResize(_ mode: Int) {
@@ -866,14 +896,18 @@ final class MPVPlayerViewController: UIViewController {
 
     func destroyPlayer() {
         NotificationCenter.default.removeObserver(self)
-        UIApplication.shared.endReceivingRemoteControlEvents()
+        if !embeddedPlayback {
+            UIApplication.shared.endReceivingRemoteControlEvents()
+        }
         resignFirstResponder()
         pendingLoadRetryWorkItem?.cancel()
         pendingLoadRetryWorkItem = nil
         pendingSurfaceLayoutWorkItems.forEach { $0.cancel() }
         pendingSurfaceLayoutWorkItems.removeAll(keepingCapacity: false)
         pendingLoadRequest = nil
-        nowPlayingController.invalidate()
+        if !embeddedPlayback {
+            nowPlayingController.invalidate()
+        }
         clearPlaybackError()
         deactivateAudioSession()
         guard let ctx = mpv else { return }
@@ -882,18 +916,22 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func activateAudioSessionForPlayback() {
+        guard !embeddedPlayback || !muted else { return }
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .moviePlayback)
             try session.setActive(true)
+            audioSessionActivated = true
         } catch {
             print("[NowPlaying] Failed to activate audio session: \(error)")
         }
     }
 
     private func deactivateAudioSession() {
+        guard audioSessionActivated else { return }
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            audioSessionActivated = false
         } catch {
             print("[NowPlaying] Failed to deactivate audio session: \(error)")
         }
@@ -930,6 +968,7 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func syncNowPlayingPlaybackState(isPlaying: Bool) {
+        guard !embeddedPlayback else { return }
         nowPlayingController.syncPlayback(
             positionMs: positionMs,
             durationMs: durationMs,
@@ -1018,6 +1057,7 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func publishNowPlayingForPlaybackSession() {
+        guard !embeddedPlayback else { return }
         activateAudioSessionForPlayback()
         if isViewLoaded, view.window != nil {
             becomeFirstResponder()

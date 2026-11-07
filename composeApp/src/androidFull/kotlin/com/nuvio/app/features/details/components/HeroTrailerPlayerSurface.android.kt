@@ -47,6 +47,7 @@ actual fun HeroTrailerPlayerSurface(
     onError: () -> Unit,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
+    fullscreen: Boolean,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current

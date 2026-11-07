@@ -8,6 +8,7 @@ import platform.UIKit.UIViewController
  */
 interface NuvioPlayerBridge {
     fun createPlayerViewController(): UIViewController
+    fun configurePresentation(embedded: Boolean, fullscreen: Boolean, muted: Boolean)
     fun loadFile(url: String)
     fun loadFileWithAudio(
         videoUrl: String,

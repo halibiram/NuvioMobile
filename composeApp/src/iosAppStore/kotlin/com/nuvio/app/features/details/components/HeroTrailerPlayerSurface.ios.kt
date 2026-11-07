@@ -16,6 +16,7 @@ actual fun HeroTrailerPlayerSurface(
     onError: () -> Unit,
     onControllerReady: (com.nuvio.app.features.player.PlayerEngineController) -> Unit,
     onSnapshot: (com.nuvio.app.features.player.PlayerPlaybackSnapshot) -> Unit,
+    fullscreen: Boolean,
 ) {
     LaunchedEffect(sourceUrl) {
         onError()

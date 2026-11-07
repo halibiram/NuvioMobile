@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,14 @@ import org.jetbrains.compose.resources.stringResource
 
 private const val TAG = "NuvioiOSPlayer"
 
+internal data class IosPlayerPresentation(
+    val embedded: Boolean = false,
+    val fullscreen: Boolean = true,
+    val muted: Boolean = false,
+)
+
+internal val LocalIosPlayerPresentation = staticCompositionLocalOf { IosPlayerPresentation() }
+
 @OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun PlatformPlayerSurface(
@@ -69,8 +78,15 @@ actual fun PlatformPlayerSurface(
     val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     val latestPlayerSettings = rememberUpdatedState(playerSettings)
 
+    val presentation = LocalIosPlayerPresentation.current
     val bridge = remember {
-        NuvioPlayerBridgeFactory.create()
+        NuvioPlayerBridgeFactory.create()?.also {
+            it.configurePresentation(
+                embedded = presentation.embedded,
+                fullscreen = presentation.fullscreen,
+                muted = presentation.muted,
+            )
+        }
     }
 
     if (bridge == null) {
@@ -78,6 +94,15 @@ actual fun PlatformPlayerSurface(
             latestOnError.value(getString(Res.string.player_error_mpv_unavailable))
         }
         return
+    }
+
+    DisposableEffect(bridge, presentation) {
+        bridge.configurePresentation(
+            embedded = presentation.embedded,
+            fullscreen = presentation.fullscreen,
+            muted = presentation.muted,
+        )
+        onDispose { }
     }
 
     val controller = remember(bridge) {
